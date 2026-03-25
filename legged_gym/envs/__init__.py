@@ -43,13 +43,15 @@ from .anymal_c.mixed_terrains.anymal_c_taskbook_config import (
 from .cassie.cassie import Cassie
 from .cassie.cassie_config import CassieRoughCfg, CassieRoughCfgPPO
 from .go2.go2_config import GO2RoughCfg, GO2RoughCfgPPO
-from .go2.go2_nsr_config import (
+from .go2.go2_stage1_config import (
+    GO2Stage1BlindFlatCfg,
+    GO2Stage1BlindFlatCfgPPO,
+    GO2Stage1BlindHardenedCfg,
+    GO2Stage1BlindHardenedCfgPPO,
+    GO2Stage1BlindCfg,
+    GO2Stage1BlindCfgPPO,
     GO2Stage1GTCleanCfg,
     GO2Stage1GTCleanCfgPPO,
-    GO2Stage2GTNoiseCfg,
-    GO2Stage2GTNoiseCfgPPO,
-    GO2Stage3NSRAdaptCfg,
-    GO2Stage3NSRAdaptCfgPPO,
 )
 from .go2.go2_taskbook_config import (
     GO2CollectCfg,
@@ -73,12 +75,14 @@ task_registry.register( "anymal_b", Anymal, AnymalBRoughCfg(), AnymalBRoughCfgPP
 task_registry.register( "a1", LeggedRobot, A1RoughCfg(), A1RoughCfgPPO() )
 task_registry.register( "go2", LeggedRobot, GO2RoughCfg(), GO2RoughCfgPPO() )
 task_registry.register( "rough_go2", LeggedRobot, GO2RoughCfg(), GO2RoughCfgPPO() )
+task_registry.register( "go2_stage1_blind_flat", LeggedRobot, GO2Stage1BlindFlatCfg(), GO2Stage1BlindFlatCfgPPO() )
+task_registry.register( "rough_go2_stage1_blind_flat", LeggedRobot, GO2Stage1BlindFlatCfg(), GO2Stage1BlindFlatCfgPPO() )
+task_registry.register( "go2_stage1_blind_hardened", LeggedRobot, GO2Stage1BlindHardenedCfg(), GO2Stage1BlindHardenedCfgPPO() )
+task_registry.register( "rough_go2_stage1_blind_hardened", LeggedRobot, GO2Stage1BlindHardenedCfg(), GO2Stage1BlindHardenedCfgPPO() )
+task_registry.register( "go2_stage1_blind", LeggedRobot, GO2Stage1BlindCfg(), GO2Stage1BlindCfgPPO() )
+task_registry.register( "rough_go2_stage1_blind", LeggedRobot, GO2Stage1BlindCfg(), GO2Stage1BlindCfgPPO() )
 task_registry.register( "go2_stage1_gt_clean", LeggedRobot, GO2Stage1GTCleanCfg(), GO2Stage1GTCleanCfgPPO() )
 task_registry.register( "rough_go2_stage1_gt_clean", LeggedRobot, GO2Stage1GTCleanCfg(), GO2Stage1GTCleanCfgPPO() )
-task_registry.register( "go2_stage2_gt_noise", LeggedRobot, GO2Stage2GTNoiseCfg(), GO2Stage2GTNoiseCfgPPO() )
-task_registry.register( "rough_go2_stage2_gt_noise", LeggedRobot, GO2Stage2GTNoiseCfg(), GO2Stage2GTNoiseCfgPPO() )
-task_registry.register( "go2_stage3_nsr_adapt", LeggedRobot, GO2Stage3NSRAdaptCfg(), GO2Stage3NSRAdaptCfgPPO() )
-task_registry.register( "rough_go2_stage3_nsr_adapt", LeggedRobot, GO2Stage3NSRAdaptCfg(), GO2Stage3NSRAdaptCfgPPO() )
 task_registry.register( "go2_collect", LeggedRobot, GO2CollectCfg(), GO2CollectCfgPPO() )
 task_registry.register( "rough_go2_collect", LeggedRobot, GO2CollectCfg(), GO2CollectCfgPPO() )
 task_registry.register( "go2_taskbook", LeggedRobot, GO2TaskbookCfg(), GO2TaskbookCfgPPO() )

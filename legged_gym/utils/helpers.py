@@ -116,13 +116,30 @@ def get_load_path(root, load_run=-1, checkpoint=-1):
                 checkpoint = checkpoint_int
         except ValueError:
             pass
+    def _has_model_file(run_dir):
+        try:
+            files = os.listdir(run_dir)
+        except Exception:
+            return False
+        return any("model" in f for f in files)
+
     try:
-        runs = os.listdir(root)
-        #TODO sort by date to handle change of month
-        runs.sort()
-        if 'exported' in runs: runs.remove('exported')
-        last_run = os.path.join(root, runs[-1])
-    except:
+        run_names = []
+        for name in os.listdir(root):
+            full = os.path.join(root, name)
+            if not os.path.isdir(full):
+                continue
+            if name == "exported":
+                continue
+            if not _has_model_file(full):
+                continue
+            run_names.append(name)
+        # TODO sort by date to handle change of month
+        run_names.sort()
+        if len(run_names) == 0:
+            raise ValueError
+        last_run = os.path.join(root, run_names[-1])
+    except Exception:
         raise ValueError("No runs in this directory: " + root)
     if load_run==-1:
         load_run = last_run

@@ -161,6 +161,9 @@ class LeggedRobotCfg(BaseConfig):
         soft_dof_vel_limit = 1.
         soft_torque_limit = 1.
         base_height_target = 1.
+        # If > 0, terminate episode when base height drops below this threshold.
+        # Keep <= 0 to disable.
+        min_base_height = -1.0
         max_contact_force = 100. # forces above this value are penalized
 
     class normalization:

@@ -22,7 +22,7 @@ import torch
 
 def get_eval_args():
     custom_parameters = [
-        {"name": "--task", "type": str, "default": "rough_go2_stage1_gt_clean", "help": "Task name."},
+        {"name": "--task", "type": str, "default": "rough_go2_stage1_blind_hardened", "help": "Task name."},
         {"name": "--resume", "action": "store_true", "default": True, "help": "Load policy checkpoint."},
         {"name": "--experiment_name", "type": str, "help": "Experiment name override."},
         {"name": "--run_name", "type": str, "help": "Run name override."},
@@ -145,6 +145,7 @@ def main():
     terrain_props = getattr(env.cfg.terrain, "terrain_proportions", [1.0])
     terrain_props_cumsum = np.cumsum(np.asarray(terrain_props, dtype=np.float64)).tolist()
     terrain_num_cols = int(getattr(env.cfg.terrain, "num_cols", 1))
+    has_terrain_labels = hasattr(env, "terrain_types")
 
     ep_len = torch.zeros(num_envs, dtype=torch.long, device=env.device)
     ep_return = torch.zeros(num_envs, dtype=torch.float, device=env.device)
@@ -184,7 +185,10 @@ def main():
         # Track progress relative to each episode's own start state (not env origin).
         curr_xy_travel = torch.norm(env.root_states[:, :2] - ep_start_xy, dim=1)
         ep_max_xy_travel = torch.maximum(ep_max_xy_travel, curr_xy_travel)
-        terrain_cols_before = env.terrain_types.clone()
+        if has_terrain_labels:
+            terrain_cols_before = env.terrain_types.clone()
+        else:
+            terrain_cols_before = None
 
         _sync_if_cuda(env.device)
         t0 = time.perf_counter()
@@ -223,14 +227,20 @@ def main():
         else:
             timeout_flags = torch.zeros(done_ids.numel(), dtype=torch.bool, device=env.device)
 
-        done_cols = terrain_cols_before[done_ids].detach().cpu().numpy()
+        if terrain_cols_before is not None:
+            done_cols = terrain_cols_before[done_ids].detach().cpu().numpy()
+        else:
+            done_cols = np.zeros(done_ids.numel(), dtype=np.int64)
         done_lens = ep_len[done_ids].detach().cpu().numpy()
         done_rets = ep_return[done_ids].detach().cpu().numpy()
         done_max_xy_travel = ep_max_xy_travel[done_ids].detach().cpu().numpy()
         done_success = timeout_flags.detach().cpu().numpy().astype(np.bool_)
 
         for i in range(done_ids.numel()):
-            label = terrain_label_from_col(int(done_cols[i]), terrain_num_cols, terrain_props_cumsum)
+            if has_terrain_labels:
+                label = terrain_label_from_col(int(done_cols[i]), terrain_num_cols, terrain_props_cumsum)
+            else:
+                label = "flat"
             succ = bool(done_success[i])
             this_len = int(done_lens[i])
             this_ret = float(done_rets[i])
@@ -248,7 +258,17 @@ def main():
                 this_max_xy_travel,
             )
 
-            if label in ("smooth_slope", "rough_slope"):
+            if label == "flat":
+                add_episode(by_group, "flat", succ, this_len, this_ret)
+                add_episode_robust(
+                    by_group_robust,
+                    "flat",
+                    succ,
+                    encountered,
+                    progressed,
+                    this_max_xy_travel,
+                )
+            elif label in ("smooth_slope", "rough_slope"):
                 add_episode(by_group, "slope", succ, this_len, this_ret)
                 add_episode_robust(
                     by_group_robust,
