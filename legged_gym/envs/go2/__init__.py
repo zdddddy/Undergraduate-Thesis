@@ -9,6 +9,14 @@ from .go2_stage1_config import (
     GO2Stage1GTCleanCfg,
     GO2Stage1GTCleanCfgPPO,
 )
+from .go2_stage2_config import (
+    GO2Stage2GTTeacherCfg,
+    GO2Stage2GTTeacherCfgPPO,
+    GO2Stage2GTTeacherHardenedCfg,
+    GO2Stage2GTTeacherHardenedCfgPPO,
+    GO2Stage2GTCfg,
+    GO2Stage2GTCfgPPO,
+)
 from .go2_taskbook_config import (
     GO2CollectCfg,
     GO2CollectCfgPPO,

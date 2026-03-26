@@ -53,6 +53,14 @@ from .go2.go2_stage1_config import (
     GO2Stage1GTCleanCfg,
     GO2Stage1GTCleanCfgPPO,
 )
+from .go2.go2_stage2_config import (
+    GO2Stage2GTTeacherCfg,
+    GO2Stage2GTTeacherCfgPPO,
+    GO2Stage2GTTeacherHardenedCfg,
+    GO2Stage2GTTeacherHardenedCfgPPO,
+    GO2Stage2GTCfg,
+    GO2Stage2GTCfgPPO,
+)
 from .go2.go2_taskbook_config import (
     GO2CollectCfg,
     GO2CollectCfgPPO,
@@ -83,6 +91,12 @@ task_registry.register( "go2_stage1_blind", LeggedRobot, GO2Stage1BlindCfg(), GO
 task_registry.register( "rough_go2_stage1_blind", LeggedRobot, GO2Stage1BlindCfg(), GO2Stage1BlindCfgPPO() )
 task_registry.register( "go2_stage1_gt_clean", LeggedRobot, GO2Stage1GTCleanCfg(), GO2Stage1GTCleanCfgPPO() )
 task_registry.register( "rough_go2_stage1_gt_clean", LeggedRobot, GO2Stage1GTCleanCfg(), GO2Stage1GTCleanCfgPPO() )
+task_registry.register( "go2_stage2_gt_teacher", LeggedRobot, GO2Stage2GTTeacherCfg(), GO2Stage2GTTeacherCfgPPO() )
+task_registry.register( "rough_go2_stage2_gt_teacher", LeggedRobot, GO2Stage2GTTeacherCfg(), GO2Stage2GTTeacherCfgPPO() )
+task_registry.register( "go2_stage2_gt_teacher_hardened", LeggedRobot, GO2Stage2GTTeacherHardenedCfg(), GO2Stage2GTTeacherHardenedCfgPPO() )
+task_registry.register( "rough_go2_stage2_gt_teacher_hardened", LeggedRobot, GO2Stage2GTTeacherHardenedCfg(), GO2Stage2GTTeacherHardenedCfgPPO() )
+task_registry.register( "go2_stage2_gt", LeggedRobot, GO2Stage2GTCfg(), GO2Stage2GTCfgPPO() )
+task_registry.register( "rough_go2_stage2_gt", LeggedRobot, GO2Stage2GTCfg(), GO2Stage2GTCfgPPO() )
 task_registry.register( "go2_collect", LeggedRobot, GO2CollectCfg(), GO2CollectCfgPPO() )
 task_registry.register( "rough_go2_collect", LeggedRobot, GO2CollectCfg(), GO2CollectCfgPPO() )
 task_registry.register( "go2_taskbook", LeggedRobot, GO2TaskbookCfg(), GO2TaskbookCfgPPO() )

@@ -36,6 +36,12 @@ def get_eval_args():
             "type": int,
             "help": "Compatibility arg for shared cfg updater (unused in eval).",
         },
+        {
+            "name": "--keep_height_measurements",
+            "action": "store_true",
+            "default": False,
+            "help": "Keep terrain height observations enabled in all scenarios (useful for stage-2 235-dim policies).",
+        },
 
         # Nominal tracking scenario
         {"name": "--cruise_speed_mps", "type": float, "default": 0.7, "help": "Nominal commanded forward speed."},
@@ -137,7 +143,8 @@ def _apply_common_runtime(cfg, num_envs):
 def _apply_nominal_cfg(cfg, args):
     _apply_common_runtime(cfg, args.num_envs)
     cfg.terrain.mesh_type = "plane"
-    cfg.terrain.measure_heights = False
+    if not bool(args.keep_height_measurements):
+        cfg.terrain.measure_heights = False
     cfg.terrain.curriculum = False
     cfg.noise.add_noise = False
     cfg.domain_rand.randomize_friction = False
@@ -149,7 +156,8 @@ def _apply_nominal_cfg(cfg, args):
 def _apply_push_cfg(cfg, args):
     _apply_common_runtime(cfg, args.num_envs)
     cfg.terrain.mesh_type = "plane"
-    cfg.terrain.measure_heights = False
+    if not bool(args.keep_height_measurements):
+        cfg.terrain.measure_heights = False
     cfg.terrain.curriculum = False
     cfg.noise.add_noise = False
     cfg.domain_rand.randomize_friction = False
@@ -163,7 +171,8 @@ def _apply_push_cfg(cfg, args):
 def _apply_robust_cfg(cfg, args):
     _apply_common_runtime(cfg, args.num_envs)
     cfg.terrain.curriculum = False
-    cfg.terrain.measure_heights = False
+    if not bool(args.keep_height_measurements):
+        cfg.terrain.measure_heights = False
     cfg.domain_rand.randomize_friction = True
     cfg.domain_rand.friction_range = [float(args.robust_friction_min), float(args.robust_friction_max)]
     cfg.domain_rand.randomize_base_mass = True
@@ -178,7 +187,8 @@ def _apply_play_profile_cfg(cfg, args):
     cfg.terrain.curriculum = False
     cfg.terrain.num_rows = 5
     cfg.terrain.num_cols = 5
-    cfg.terrain.measure_heights = False
+    if not bool(args.keep_height_measurements):
+        cfg.terrain.measure_heights = False
     cfg.noise.add_noise = False
     cfg.domain_rand.randomize_friction = False
     cfg.domain_rand.randomize_base_mass = False
@@ -188,7 +198,8 @@ def _apply_play_profile_cfg(cfg, args):
 def _apply_first_sim_profile_cfg(cfg, args):
     _apply_common_runtime(cfg, args.num_envs)
     cfg.terrain.curriculum = False
-    cfg.terrain.measure_heights = False
+    if not bool(args.keep_height_measurements):
+        cfg.terrain.measure_heights = False
     cfg.noise.add_noise = False
     cfg.domain_rand.randomize_friction = False
     cfg.domain_rand.randomize_base_mass = False

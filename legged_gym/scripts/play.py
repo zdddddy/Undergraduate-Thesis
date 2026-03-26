@@ -47,12 +47,14 @@ def play(args):
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
     env_cfg.domain_rand.push_robots = False
-    # Lock commands for forward-only playback: x > 0, y = 0, yaw = 0.
-    env_cfg.commands.heading_command = False
-    env_cfg.commands.ranges.lin_vel_x = [0.4, 0.8]
-    env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
-    env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
-    env_cfg.commands.ranges.heading = [0.0, 0.0]
+    # Keep task command ranges by default so play can freely explore.
+    # Set PLAY_FORWARD_ONLY=1 for forward-only debugging.
+    if os.getenv("PLAY_FORWARD_ONLY", "0") == "1":
+        env_cfg.commands.heading_command = False
+        env_cfg.commands.ranges.lin_vel_x = [0.4, 0.8]
+        env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
+        env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
+        env_cfg.commands.ranges.heading = [0.0, 0.0]
 
     # Kept for compatibility with repositories that still use this flag.
     env_cfg.env.test = True

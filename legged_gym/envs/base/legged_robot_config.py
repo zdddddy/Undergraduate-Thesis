@@ -52,6 +52,9 @@ class LeggedRobotCfg(BaseConfig):
         restitution = 0.
         # rough terrain only:
         measure_heights = True
+        # Observation centering for height samples: base_z - center - terrain_z.
+        # Keep legacy default for backward compatibility with older checkpoints.
+        height_measurements_center = 0.5
         measured_points_x = [-0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] # 1mx1.6m rectangle (without center line)
         measured_points_y = [-0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5]
         selected = False # select a unique terrain type and pass all arguments
@@ -161,6 +164,8 @@ class LeggedRobotCfg(BaseConfig):
         soft_dof_vel_limit = 1.
         soft_torque_limit = 1.
         base_height_target = 1.
+        # If True, base-height penalty uses clearance relative to local terrain.
+        base_height_use_terrain = False
         # If > 0, terminate episode when base height drops below this threshold.
         # Keep <= 0 to disable.
         min_base_height = -1.0

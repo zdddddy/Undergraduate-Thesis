@@ -244,7 +244,16 @@ class LeggedRobot(BaseTask):
                                     ),dim=-1)
         # add perceptive inputs if not blind
         if self.cfg.terrain.measure_heights:
-            heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
+            measured_heights = self.measured_heights
+            if not torch.is_tensor(measured_heights):
+                measured_heights = self._get_heights_nsr() if getattr(self, "nsr_enabled", False) else self._get_heights()
+                self.measured_heights = measured_heights
+            height_center = float(getattr(self.cfg.terrain, "height_measurements_center", 0.5))
+            heights = torch.clip(
+                self.root_states[:, 2].unsqueeze(1) - height_center - measured_heights,
+                -1,
+                1.,
+            ) * self.obs_scales.height_measurements
             # Optional explicit height-map noise in meters (for RL robustness to NSR prediction errors).
             h_noise_min_m = float(getattr(self.cfg.noise, "height_measurements_noise_m_min", 0.0))
             h_noise_max_m = float(getattr(self.cfg.noise, "height_measurements_noise_m_max", 0.0))
@@ -1551,6 +1560,12 @@ class LeggedRobot(BaseTask):
     def _reward_base_height(self):
         # Penalize base height away from target
         base_height = self.root_states[:, 2]
+        if bool(getattr(self.cfg.rewards, "base_height_use_terrain", False)) and self.cfg.terrain.measure_heights:
+            measured_heights = self.measured_heights
+            if not torch.is_tensor(measured_heights):
+                measured_heights = self._get_heights_nsr() if getattr(self, "nsr_enabled", False) else self._get_heights()
+                self.measured_heights = measured_heights
+            base_height = base_height - torch.mean(measured_heights, dim=1)
         return torch.square(base_height - self.cfg.rewards.base_height_target)
     
     def _reward_torques(self):
