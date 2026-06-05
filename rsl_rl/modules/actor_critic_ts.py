@@ -5,9 +5,15 @@ import torch.nn as nn
 from torch.distributions import Normal
 from .actor_critic import get_activation
 
-'''
-Actor-Critic for Teacher-Student architecture.
-'''
+"""
+Actor-Critic for TS architecture.
+
+Naming note:
+- "deploy" branch: actor uses runtime terrain observations (former teacher path).
+- "aux" branch: actor uses history encoder latent (former student path).
+
+The legacy teacher/student method names are preserved as compatibility aliases.
+"""
 
 class ActorCriticTS(nn.Module):
     is_recurrent = False
@@ -160,8 +166,17 @@ class ActorCriticTS(nn.Module):
     def entropy(self):
         return self.distribution.entropy().sum(dim=-1)
 
+    def _encode_deploy_latent(self, terrain_observations):
+        return self.privilege_encoder(terrain_observations)
+
+    def _encode_aux_latent(self, observation_history):
+        if self.history_encoder_type == "TCN":
+            # input shape (batch_size, obs_history_len) -> (batch_size, 1, obs_history_len)
+            observation_history = observation_history.unsqueeze(1)
+        return self.history_encoder(observation_history)
+
     def update_distribution(self, observations, privilege_observations):
-        latent = self.privilege_encoder(privilege_observations)
+        latent = self._encode_deploy_latent(privilege_observations)
         mean = self.actor(torch.cat(
             (
             observations, latent
@@ -175,24 +190,28 @@ class ActorCriticTS(nn.Module):
     def get_actions_log_prob(self, actions):
         return self.distribution.log_prob(actions).sum(dim=-1)
     
-    def act_teacher(self, observations, privilege_observations, **kwargs):
-        latent = self.privilege_encoder(privilege_observations)
+    def act_deploy(self, observations, terrain_observations, **kwargs):
+        latent = self._encode_deploy_latent(terrain_observations)
         actions_mean = self.actor(torch.cat(
             (
             observations, latent
             ), dim=-1))
         return actions_mean
 
-    def act_student(self, observations, observation_history, **kwargs):
-        if self.history_encoder_type == "TCN":
-            # input shape (batch_size, obs_history_len) -> (batch_size, 1, obs_history_len)
-            observation_history = observation_history.unsqueeze(1)
-        latent = self.history_encoder(observation_history)
+    def act_aux(self, observations, observation_history, **kwargs):
+        latent = self._encode_aux_latent(observation_history)
         actions_mean = self.actor(torch.cat(
             (
             observations, latent
             ), dim=-1))
         return actions_mean
+
+    # Backward-compatible aliases for existing TS call sites.
+    def act_teacher(self, observations, privilege_observations, **kwargs):
+        return self.act_deploy(observations, privilege_observations, **kwargs)
+
+    def act_student(self, observations, observation_history, **kwargs):
+        return self.act_aux(observations, observation_history, **kwargs)
 
     def evaluate(self, critic_observations, **kwargs):
         value = self.critic(critic_observations)

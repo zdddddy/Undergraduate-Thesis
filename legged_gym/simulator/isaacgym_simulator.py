@@ -41,7 +41,12 @@ class IsaacGymSimulator(Simulator):
                                     self._mesh_ids, 
                                     self._device)
                 pixels = self._depth_camera_sensor.update()
-                self._depth_images[:,0] = pixels[:,0] # pixels: [num_envs, num_sensors, H, W]
+                if self._cfg.sensor.depth_camera_config.return_pointcloud:
+                    # pixels: [num_envs, num_sensors, H, W, 3]
+                    self._depth_images[:] = pixels
+                else:
+                    # pixels: [num_envs, num_sensors, H, W], use the first sensor for depth-image tasks
+                    self._depth_images[:, 0] = pixels[:, 0]
 
     #----- Public methods -----#
     def step(self, actions):
@@ -85,11 +90,16 @@ class IsaacGymSimulator(Simulator):
             if self._cfg.terrain.obtain_terrain_info_around_feet:
                 self._calc_terrain_info_around_feet()
         if self._cfg.sensor.use_warp and self._cfg.sensor.add_depth:
-            # Refresh warp sensor pose
-            sensor_quat = quat_mul(self._base_quat[:self._num_camera_envs], self._sensor_offset_quat)
-            sensor_pos = self._base_pos[:self._num_camera_envs] + quat_apply(self._base_quat[:self._num_camera_envs], self._sensor_offset_pos)
-            self._sensor_pos_tensor[:,:] = sensor_pos[:,:]
-            self._sensor_quat_tensor[:,:] = sensor_quat[:,:]
+            # Refresh warp sensor poses for all mounted sensors.
+            num_sensors = int(self._cfg.sensor.depth_camera_config.num_sensors)
+            base_quat = self._base_quat[:self._num_camera_envs].unsqueeze(1).expand(-1, num_sensors, -1)
+            base_pos = self._base_pos[:self._num_camera_envs].unsqueeze(1).expand(-1, num_sensors, -1)
+            offset_quat = self._sensor_offset_quat.unsqueeze(0).expand(self._num_camera_envs, -1, -1)
+            offset_pos = self._sensor_offset_pos.unsqueeze(0).expand(self._num_camera_envs, -1, -1)
+            sensor_quat = quat_mul(base_quat, offset_quat)
+            sensor_pos = base_pos + quat_apply(base_quat, offset_pos)
+            self._sensor_pos_tensor[:, :, :] = sensor_pos
+            self._sensor_quat_tensor[:, :, :] = sensor_quat
     
     def reset_idx(self, env_ids):
         # rigid body props and joint props in IsaacGym can not be modified on the fly
@@ -257,7 +267,13 @@ class IsaacGymSimulator(Simulator):
         self._debug = self._cfg.env.debug
         self._control_dt = self._cfg.sim.dt * self._cfg.control.decimation
         if self._cfg.sensor.add_depth:
-            self._num_camera_envs = self._cfg.env.num_camera_envs
+            requested_camera_envs = int(getattr(self._cfg.env, "num_camera_envs", self._cfg.env.num_envs))
+            self._num_camera_envs = max(1, min(requested_camera_envs, int(self._cfg.env.num_envs)))
+            if self._num_camera_envs != requested_camera_envs:
+                print(
+                    f"[IsaacGymSimulator] Clamped num_camera_envs from {requested_camera_envs} "
+                    f"to {self._num_camera_envs} to match num_envs={self._cfg.env.num_envs}."
+                )
             # update counter for depth images
             self._depth_image_update_counter = 0
             self._depth_image_update_decimation = self._cfg.sensor.depth_camera_config.decimation
@@ -584,8 +600,8 @@ class IsaacGymSimulator(Simulator):
                 pointcloud_dims = 3 * (self._cfg.sensor.depth_camera_config.return_pointcloud == True)
                 if pointcloud_dims > 0: # pointcloud returned by depth camera
                     self._depth_images = torch.zeros(
-                        (self._num_camera_envs, 
-                        self._cfg.sensor.depth_camera_config.num_history,
+                        (self._num_camera_envs,
+                        self._cfg.sensor.depth_camera_config.num_sensors,
                         *self._cfg.sensor.depth_camera_config.resolution,
                         pointcloud_dims), 
                         device=self._device, 
@@ -840,14 +856,18 @@ class IsaacGymSimulator(Simulator):
             near_clip = self._cfg.sensor.depth_camera_config.near_clip
             far_clip = self._cfg.sensor.depth_camera_config.far_clip
             pixels = self._depth_camera_sensor.update().clone()
-            if self._depth_images.shape[1] > 1: # stack history of depth images
-                self._depth_images[:, 1:] = self._depth_images[:, :-1].detach().clone()
-            # store values for denoised depth images
-            self._depth_images[:, 0] = pixels[:,0,:,:] # pixels: [num_envs, num_sensors, H, W]
-            # clip values
-            self._depth_images[:, 0] = torch.clip(self._depth_images[:, 0], near_clip, far_clip)
-            # normalize the depth images to be within [-0.5, 0.5]
-            self._depth_images[:, 0] = (self._depth_images[:, 0] - near_clip) / (far_clip - near_clip) - 0.5
+            if self._cfg.sensor.depth_camera_config.return_pointcloud:
+                # pixels: [num_envs, num_sensors, H, W, 3]
+                self._depth_images[:] = pixels
+            else:
+                if self._depth_images.shape[1] > 1: # stack history of depth images
+                    self._depth_images[:, 1:] = self._depth_images[:, :-1].detach().clone()
+                # store values for denoised depth images
+                self._depth_images[:, 0] = pixels[:,0,:,:] # pixels: [num_envs, num_sensors, H, W]
+                # clip values
+                self._depth_images[:, 0] = torch.clip(self._depth_images[:, 0], near_clip, far_clip)
+                # normalize the depth images to be within [-0.5, 0.5]
+                self._depth_images[:, 0] = (self._depth_images[:, 0] - near_clip) / (far_clip - near_clip) - 0.5
     
     def _create_warp_envs(self):
         terrain_mesh = self._terrain.terrain_mesh
@@ -880,37 +900,56 @@ class IsaacGymSimulator(Simulator):
     
     def _create_warp_tensors(self):
         self._warp_tensor_dict={}
+        num_sensors = int(self._cfg.sensor.depth_camera_config.num_sensors)
         pointcloud_dims = 3 * (self._cfg.sensor.depth_camera_config.return_pointcloud == True)
         if pointcloud_dims > 0:
             self._depth_image_tensor_warp = torch.zeros((self._num_camera_envs, 
-                                                        self._cfg.sensor.depth_camera_config.num_sensors,
+                                                        num_sensors,
                                                         *self._cfg.sensor.depth_camera_config.resolution,
                                                         pointcloud_dims),    # xyz
                                                        dtype=torch.float32, device=self._device)
         else:
             self._depth_image_tensor_warp = torch.zeros((self._num_camera_envs, 
-                                                        self._cfg.sensor.depth_camera_config.num_sensors,
+                                                        num_sensors,
                                                         *self._cfg.sensor.depth_camera_config.resolution),
                                                     dtype=torch.float32, device=self._device)
-        self._sensor_pos_tensor = torch.zeros_like(self._root_states[:self._num_camera_envs, 0:3])
-        self._sensor_quat_tensor = torch.zeros_like(self._root_states[:self._num_camera_envs, 3:7])
+        self._sensor_pos_tensor = torch.zeros(
+            (self._num_camera_envs, num_sensors, 3),
+            dtype=torch.float32,
+            device=self._device,
+        )
+        self._sensor_quat_tensor = torch.zeros(
+            (self._num_camera_envs, num_sensors, 4),
+            dtype=torch.float32,
+            device=self._device,
+        )
 
-        # sensor pose
-        pos_offset = [self._cfg.sensor.depth_camera_config.pos[0], 
-                      self._cfg.sensor.depth_camera_config.pos[1], 
-                      self._cfg.sensor.depth_camera_config.pos[2]]
-        rpy_offset = [self._cfg.sensor.depth_camera_config.euler[0], 
-                      self._cfg.sensor.depth_camera_config.euler[1], 
-                      self._cfg.sensor.depth_camera_config.euler[2]]
-        self._sensor_offset_pos = torch.tensor(pos_offset, device=self._device).repeat((self._num_camera_envs, 1))
-        rpy_offset = torch.tensor(rpy_offset, device=self._device)
+        # sensor pose offsets support either a single (x,y,z)/(r,p,y) or one tuple per sensor.
+        pos_cfg = self._cfg.sensor.depth_camera_config.pos
+        euler_cfg = self._cfg.sensor.depth_camera_config.euler
+        if isinstance(pos_cfg[0], (list, tuple)):
+            if len(pos_cfg) != num_sensors:
+                raise ValueError("depth_camera_config.pos length must match num_sensors")
+            pos_list = pos_cfg
+        else:
+            pos_list = [pos_cfg] * num_sensors
+        if isinstance(euler_cfg[0], (list, tuple)):
+            if len(euler_cfg) != num_sensors:
+                raise ValueError("depth_camera_config.euler length must match num_sensors")
+            euler_list = euler_cfg
+        else:
+            euler_list = [euler_cfg] * num_sensors
 
-        self._sensor_offset_quat = quat_from_euler_xyz(rpy_offset[0], rpy_offset[1], rpy_offset[2]).repeat((self._num_camera_envs, 1))
+        self._sensor_offset_pos = torch.tensor(pos_list, dtype=torch.float32, device=self._device)
+        rpy_offset = torch.tensor(euler_list, dtype=torch.float32, device=self._device)
+        self._sensor_offset_quat = quat_from_euler_xyz(
+            rpy_offset[:, 0], rpy_offset[:, 1], rpy_offset[:, 2]
+        )
         
         self._warp_tensor_dict["depth_image_tensor"] = self._depth_image_tensor_warp
         self._warp_tensor_dict['device'] = self._device
         self._warp_tensor_dict['num_envs'] = self._num_camera_envs
-        self._warp_tensor_dict['num_sensors'] = self._cfg.sensor.depth_camera_config.num_sensors
+        self._warp_tensor_dict['num_sensors'] = num_sensors
         self._warp_tensor_dict['sensor_pos_tensor'] = self._sensor_pos_tensor
         self._warp_tensor_dict['sensor_quat_tensor'] = self._sensor_quat_tensor
         self._warp_tensor_dict['mesh_ids'] = self._mesh_ids

@@ -272,12 +272,10 @@ class IsaacLabSimulator(Simulator):
         prim_paths = self._cloner.generate_paths("/World/envs/env", self._num_envs)
         self._stage.DefinePrim(source_env_path, "Xform")
         
-        if self._cfg.asset.name == "go2" or self._cfg.asset.name == "g1":
-            solver_pos_iteration = 4
-            solver_vel_iteration = 0
-        elif self._cfg.asset.name == "k1":
-            solver_pos_iteration = 8
-            solver_vel_iteration = 4
+        if self._cfg.asset.name != "go2":
+            raise NameError(f"Unsupported robot after project cleanup: {self._cfg.asset.name}")
+        solver_pos_iteration = 4
+        solver_vel_iteration = 0
         
         articulation_props = sim_utils.ArticulationRootPropertiesCfg(
                     enabled_self_collisions=not self._cfg.asset.self_collisions, 
@@ -316,20 +314,8 @@ class IsaacLabSimulator(Simulator):
                                                      joint_pos=self._cfg.init_state.default_joint_angles)
         
         # specify actuator config based on the robot
-        if self._cfg.asset.name == "go2":
-            from resources.robots.unitree_robotics.go2.go2_lab_cfg import GO2_ACTUATOR_CFG
-            actuator_cfg = GO2_ACTUATOR_CFG
-        elif self._cfg.asset.name == "g1":
-            from resources.robots.unitree_robotics.g1_description.g1_lab_cfg import G1_12DOF_ACTUATOR_CFG, G1_29DOF_ACTUATOR_CFG
-            if len(self._cfg.asset.dof_names) == 12:
-                actuator_cfg = G1_12DOF_ACTUATOR_CFG
-            elif len(self._cfg.asset.dof_names) == 29:
-                actuator_cfg = G1_29DOF_ACTUATOR_CFG
-        elif self._cfg.asset.name == "k1":
-            from resources.robots.booster_robotics.K1.k1_lab_cfg import K1_ACTUATOR_CFG
-            actuator_cfg = K1_ACTUATOR_CFG
-        else:
-            raise NameError(f"Unknown robot name: {self._cfg.asset.name}")
+        from resources.robots.unitree_robotics.go2.go2_lab_cfg import GO2_ACTUATOR_CFG
+        actuator_cfg = GO2_ACTUATOR_CFG
         
         # create the first prim of env 0, then clone other envs
         articulation_cfg = ArticulationCfg(

@@ -5,7 +5,7 @@ from rsl_rl.env import VecEnv
 from rsl_rl.runners import OnPolicyRunner
 from rsl_rl.utils.runner_registry import runner_registry
 
-from legged_gym import LEGGED_GYM_ROOT_DIR
+from legged_gym import LEGGED_GYM_RESULTS_DIR
 from .helpers import get_args, update_cfg_from_args, class_to_dict, get_load_path, set_seed
 
 class TaskRegistry():
@@ -76,8 +76,8 @@ class TaskRegistry():
             name (string, optional): Name of a registered env. If None, the config file will be used instead. Defaults to None.
             args (Args, optional): Isaac Gym comand line arguments. If None get_args() will be called. Defaults to None.
             train_cfg (Dict, optional): Training config file. If None 'name' will be used to get the config file. Defaults to None.
-            log_root (str, optional): Logging directory for Tensorboard. Set to 'None' to avoid logging (at test time for example). 
-                                      Logs will be saved in <log_root>/<date_time>_<run_name>. Defaults to "default"=<path_to_LEGGED_GYM>/logs/<experiment_name>.
+            log_root (str, optional): Logging directory for Tensorboard. Set to 'None' to avoid logging (at test time for example).
+                                      Logs will be saved in <log_root>/<date_time>_<run_name>. Defaults to "default"=<project>/results/training_logs/<experiment_name>.
 
         Raises:
             ValueError: Error if neither 'name' or 'train_cfg' are provided
@@ -103,7 +103,7 @@ class TaskRegistry():
         _, train_cfg = update_cfg_from_args(None, train_cfg, args)
 
         if log_root=="default":
-            log_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)
+            log_root = os.path.join(LEGGED_GYM_RESULTS_DIR, 'training_logs', train_cfg.runner.experiment_name)
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
         elif log_root is None:
             log_dir = None
@@ -114,11 +114,7 @@ class TaskRegistry():
         sim_device = "cpu" if args.cpu else "cuda"
         # select runner according to runner_class_name
         runner_class = runner_registry.get_runner_class(train_cfg.runner_class_name)
-        if "TSDepth" in train_cfg.runner_class_name:
-            runner = runner_class(env, train_cfg_dict, log_dir, device=sim_device,
-                                  distillation=train_cfg.distillation)
-        else:
-            runner = runner_class(env, train_cfg_dict, log_dir, device=sim_device)
+        runner = runner_class(env, train_cfg_dict, log_dir, device=sim_device)
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
         if resume:
@@ -126,6 +122,14 @@ class TaskRegistry():
             resume_path = get_load_path(log_root, load_run=train_cfg.runner.load_run, checkpoint=train_cfg.runner.checkpoint)
             print(f"Loading model from: {resume_path}")
             runner.load(resume_path)
+            # Normalize run/checkpoint fields to the resolved source path.
+            train_cfg.runner.load_run = os.path.basename(os.path.dirname(resume_path))
+            ckpt_name = os.path.basename(resume_path)
+            if ckpt_name.startswith("model_") and ckpt_name.endswith(".pt"):
+                try:
+                    train_cfg.runner.checkpoint = int(ckpt_name[len("model_"):-len(".pt")])
+                except ValueError:
+                    pass
         return runner, train_cfg
 
 # make global task registry

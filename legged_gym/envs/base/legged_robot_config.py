@@ -276,6 +276,30 @@ class LeggedRobotCfg(BaseConfig):
             return_pointcloud: bool = False
             pointcloud_in_world_frame: bool = False
 
+    # NSR terrain reconstruction runtime.
+    class nsr:
+        enable: bool = False
+        # Absolute checkpoint path, or path relative to LEGGED_GYM_ROOT_DIR.
+        ckpt: str = ""
+        # Runtime fallback when checkpoint train_args are missing.
+        map_size: float = 3.2
+        resolution: float = 0.05
+        fill_value: float = 0.0
+        in_channels: int = 4
+        base_channels: int = 32
+        norm_type: str = "group"
+        group_norm_groups: int = 8
+        gravity_aligned: bool = True
+        align_prev: bool = True
+        disable_prev: bool = False
+        prev_valid_threshold: float = 0.5
+        memory_meas_override: bool = True
+        residual_from_base: bool = False
+        residual_scale: float = 0.2
+        residual_tanh: bool = True
+        # Filter out no-hit points from warp pointclouds.
+        max_valid_depth: float = 50.0
+
     class sim:
         # Common
         dt: float = 0.005                 # 200 Hz

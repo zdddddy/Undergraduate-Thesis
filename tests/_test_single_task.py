@@ -7,6 +7,11 @@ Supports IsaacGym, Genesis, and IsaacLab simulators.
 
 import sys
 import argparse
+import os
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # Import legged_gym which automatically detects and imports the correct simulator
 # based on Python version and SIMULATOR environment variable

@@ -30,19 +30,9 @@
 
 from .on_policy_runner import OnPolicyRunner
 from .ts_runner import TSRunner
-from .ee_runner import EERunner
-from .cts_runner import CTSRunner
 from .dreamwaq_runner import DreamWaQRunner
-from .ts_depth_runner import TSDepthRunner
-from .amp_runner import AMPRunner
-from .cts_amp_runner import CTS_AMP_Runner
 
 from rsl_rl.utils.runner_registry import runner_registry
 runner_registry.register("OnPolicyRunner", OnPolicyRunner)
 runner_registry.register("TSRunner", TSRunner)
-runner_registry.register("EERunner", EERunner)
-runner_registry.register("CTSRunner", CTSRunner)
 runner_registry.register("DreamWaQRunner", DreamWaQRunner)
-runner_registry.register("TSDepthRunner", TSDepthRunner)
-runner_registry.register("AMPRunner", AMPRunner)
-runner_registry.register("CTS_AMP_Runner", CTS_AMP_Runner)

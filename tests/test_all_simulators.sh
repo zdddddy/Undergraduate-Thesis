@@ -110,7 +110,7 @@ main() {
                 echo "示例:"
                 echo "  $0                                  # 测试所有仿真器的所有任务"
                 echo "  $0 --iterations 3                   # 每个任务运行3次迭代"
-                echo "  $0 --tasks go2,k1                   # 只测试go2和k1任务"
+                echo "  $0 --tasks go2,go2_stage2           # 只测试指定Go2任务"
                 exit 0
                 ;;
             *)

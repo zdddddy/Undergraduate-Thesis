@@ -170,9 +170,30 @@ class WarpCam:
         #     self.segmentation_pixels = segmentation_pixels
         self.segmentation_pixels = None
         
-        self.camera_position_array = wp.from_torch(self.camera_pos_tensor.view(self.num_envs, 1, 3), dtype=wp.vec3)
+        if self.camera_pos_tensor.dim() == 2:
+            camera_pos = self.camera_pos_tensor.unsqueeze(1)
+        else:
+            camera_pos = self.camera_pos_tensor
+        if self.camera_orientation_tensor.dim() == 2:
+            camera_quat = self.camera_orientation_tensor.unsqueeze(1)
+        else:
+            camera_quat = self.camera_orientation_tensor
+
+        if camera_pos.shape[1] != self.num_sensors:
+            raise ValueError(
+                f"WarpCam camera_pos_tensor sensor dim mismatch: expected {self.num_sensors}, got {camera_pos.shape[1]}"
+            )
+        if camera_quat.shape[1] != self.num_sensors:
+            raise ValueError(
+                f"WarpCam camera_orientation_tensor sensor dim mismatch: expected {self.num_sensors}, got {camera_quat.shape[1]}"
+            )
+
+        self.camera_position_array = wp.from_torch(
+            camera_pos.view(self.num_envs, self.num_sensors, 3), dtype=wp.vec3
+        )
         self.camera_orientation_array = wp.from_torch(
-            self.camera_orientation_tensor.view(self.num_envs, 1, 4), dtype=wp.quat)
+            camera_quat.view(self.num_envs, self.num_sensors, 4), dtype=wp.quat
+        )
     
     def tensor_indices_to_slice(idx: torch.Tensor):
         # expects 1-D int tensor

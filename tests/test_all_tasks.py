@@ -9,7 +9,7 @@ Each task runs in a separate subprocess to avoid PhysX Foundation conflicts.
 
 Usage:
     python scripts/test_all_tasks.py
-    python scripts/test_all_tasks.py --tasks go2 k1 g1  # Test specific tasks
+    python scripts/test_all_tasks.py --tasks go2 go2_stage2 go2_stage3  # Test specific tasks
     python scripts/test_all_tasks.py --iterations 3     # Run 3 iterations instead of 5
     python scripts/test_all_tasks.py --cpu             # Use CPU instead of GPU
 
@@ -25,6 +25,10 @@ import json
 import time
 from datetime import datetime
 from typing import List, Dict
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # We only import task_registry here to list tasks, not to run them
 def get_registered_tasks() -> List[str]:
@@ -213,7 +217,7 @@ Examples:
   python scripts/test_all_tasks.py
   
   # Test specific tasks
-  python scripts/test_all_tasks.py --tasks go2 k1 g1
+  python scripts/test_all_tasks.py --tasks go2 go2_stage2 go2_stage3
   
   # Run 3 iterations instead of 5
   python scripts/test_all_tasks.py --iterations 3

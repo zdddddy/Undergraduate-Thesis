@@ -28,6 +28,7 @@ isaacgym = [
     "matplotlib==3.7.5",
     "fsspec<=2025.3.0",  # fsspec==2025.3.1 has bug with python 3.8
     "isaacgym==1.0rc4",
+    "ninja",
     "onnx>=1.17.0",
     "protobuf==4.25.0"
 ]
@@ -41,5 +42,5 @@ isaaclab = [
     "isaacsim"
 ]
 
-[tool.setuptools]
-packages = ['rsl_rl', 'resources', 'legged_gym']
+[tool.setuptools.packages.find]
+include = ['legged_gym*', 'rsl_rl*', 'nsr_height*']

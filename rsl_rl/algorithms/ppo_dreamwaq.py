@@ -229,8 +229,11 @@ class PPO_DreamWaQ(PPO):
         # Ignore the explicit_estimation and reconstruction loss for terminated episodes
         reconstruction_loss = nn.functional.mse_loss(reconstructed_out * terminated_batch,
                                                              next_state_batch * terminated_batch)
-        # KL Divergence loss of VAE
-        kld_loss = -0.5 * torch.mean(torch.sum(1 + latent_var - latent_mu ** 2 - latent_var.exp(), dim = 1) * terminated_batch)
+        # KL divergence per sample. Keep the mask 1D to avoid broadcasting
+        # [batch] against [batch, 1] into a huge [batch, batch] tensor.
+        terminated_mask = terminated_batch.squeeze(-1)
+        kld_per_sample = torch.sum(1 + latent_var - latent_mu ** 2 - latent_var.exp(), dim=1)
+        kld_loss = -0.5 * torch.mean(kld_per_sample * terminated_mask)
         vae_loss = explicit_estimation_loss + reconstruction_loss + self.vae_kld_weight * kld_loss
         
         return vae_loss, explicit_estimation_loss, reconstruction_loss, kld_loss

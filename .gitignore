@@ -52,10 +52,20 @@ Thumbs.db
 # logs
 logs
 runs
+results/
+experiment/**/runs/
+*.pt
+*.pth
+*.onnx
+*.jit
+*.tfevents*
+.torch_extensions/
 
 # other
 *.egg-info
 __pycache__
+__pycache__/
+.pytest_cache/
 wandb
 build
 *debug*

@@ -1,5 +1,11 @@
 import os
+import sys
+import inspect
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LEGGED_GYM_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+if LEGGED_GYM_ROOT not in sys.path:
+    sys.path.insert(0, LEGGED_GYM_ROOT)
 
 from legged_gym import *
 from legged_gym.envs import *
@@ -19,14 +25,12 @@ def train(args):
     log_dir = ppo_runner.log_dir
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    if env_cfg.asset.name == args.task:
-        robot_file_path = os.path.join(LEGGED_GYM_ROOT_DIR, "legged_gym", "envs", env_cfg.asset.name, args.task+".py")
-        robot_config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "legged_gym", "envs", env_cfg.asset.name, args.task+"_config.py")
-    else:
-        robot_file_path = os.path.join(LEGGED_GYM_ROOT_DIR, "legged_gym", "envs", env_cfg.asset.name, args.task, args.task+".py")
-        robot_config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "legged_gym", "envs", env_cfg.asset.name, args.task, args.task+"_config.py")
-    shutil.copy(robot_file_path, log_dir)
-    shutil.copy(robot_config_path, log_dir)
+    robot_file_path = inspect.getsourcefile(env.__class__)
+    robot_config_path = inspect.getsourcefile(env_cfg.__class__)
+    if robot_file_path is not None and os.path.exists(robot_file_path):
+        shutil.copy(robot_file_path, log_dir)
+    if robot_config_path is not None and os.path.exists(robot_config_path):
+        shutil.copy(robot_config_path, log_dir)
     
     # Start training session
     ppo_runner.learn(num_learning_iterations=train_cfg.runner.max_iterations, init_at_random_ep_len=True)

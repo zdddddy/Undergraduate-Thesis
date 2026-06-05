@@ -1,14 +1,20 @@
 import time
 
-from legged_gym import *
 import os
+import sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LEGGED_GYM_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+if LEGGED_GYM_ROOT not in sys.path:
+    sys.path.insert(0, LEGGED_GYM_ROOT)
+
+from legged_gym import *
 
 from legged_gym.envs import *
 from legged_gym.utils import *
 
 import numpy as np
 import torch
-from legged_gym.scripts.joystick import Joystick
     
 def override_configs(env_cfg, args, task_type):
     """Override some environment configuration parameters for testing
@@ -21,53 +27,91 @@ def override_configs(env_cfg, args, task_type):
     # override some parameters for testing
     # number of environments
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 16)
-    if task_type == "cts" or task_type == "cts_amp": # concurrent teacher-student specific
-        env_cfg.env.num_teacher = 1
-    elif "depth" in task_type:  # depth specific
-        env_cfg.env.num_camera_envs = 1
+    if hasattr(env_cfg.env, "num_camera_envs"):
+        env_cfg.env.num_camera_envs = min(env_cfg.env.num_camera_envs, env_cfg.env.num_envs)
     env_cfg.viewer.rendered_envs_idx = list(range(env_cfg.env.num_envs))
+
+    # Disable domain randomization in play to keep evaluation behavior deterministic.
+    if hasattr(env_cfg, "domain_rand"):
+        # Turn off all supported randomization flags.
+        for attr in (
+            "randomize_friction",
+            "randomize_restitution",
+            "randomize_base_mass",
+            "randomize_com_displacement",
+            "randomize_ctrl_delay",
+            "randomize_pd_gain",
+            "randomize_joint_armature",
+            "randomize_joint_friction",
+            "randomize_joint_damping",
+            "randomize_camera_pos",
+            "randomize_camera_euler",
+        ):
+            if hasattr(env_cfg.domain_rand, attr):
+                setattr(env_cfg.domain_rand, attr, False)
+
+        # Disable external pushes.
+        if hasattr(env_cfg.domain_rand, "push_robots"):
+            env_cfg.domain_rand.push_robots = False
+        if hasattr(env_cfg.domain_rand, "max_push_vel_xy"):
+            env_cfg.domain_rand.max_push_vel_xy = 0.0
+        if hasattr(env_cfg.domain_rand, "push_links"):
+            env_cfg.domain_rand.push_links = False
+        if hasattr(env_cfg.domain_rand, "max_push_force"):
+            env_cfg.domain_rand.max_push_force = 0.0
+
+        # Collapse randomization ranges to deterministic values for safety.
+        if hasattr(env_cfg.domain_rand, "friction_range"):
+            env_cfg.domain_rand.friction_range = [1.0, 1.0]
+        if hasattr(env_cfg.domain_rand, "restitution_range"):
+            env_cfg.domain_rand.restitution_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "added_mass_range"):
+            env_cfg.domain_rand.added_mass_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "com_pos_x_range"):
+            env_cfg.domain_rand.com_pos_x_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "com_pos_y_range"):
+            env_cfg.domain_rand.com_pos_y_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "com_pos_z_range"):
+            env_cfg.domain_rand.com_pos_z_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "ctrl_delay_step_range"):
+            env_cfg.domain_rand.ctrl_delay_step_range = [0, 0]
+        if hasattr(env_cfg.domain_rand, "kp_range"):
+            env_cfg.domain_rand.kp_range = [1.0, 1.0]
+        if hasattr(env_cfg.domain_rand, "kd_range"):
+            env_cfg.domain_rand.kd_range = [1.0, 1.0]
+        if hasattr(env_cfg.domain_rand, "joint_armature_range"):
+            env_cfg.domain_rand.joint_armature_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "joint_friction_range"):
+            env_cfg.domain_rand.joint_friction_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "joint_damping_range"):
+            env_cfg.domain_rand.joint_damping_range = [0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "camera_com_displacement_range"):
+            env_cfg.domain_rand.camera_com_displacement_range = [0.0, 0.0, 0.0]
+        if hasattr(env_cfg.domain_rand, "camera_euler_range"):
+            env_cfg.domain_rand.camera_euler_range = [0.0, 0.0, 0.0]
+
+    # Disable observation noise for play.
+    if hasattr(env_cfg, "noise") and hasattr(env_cfg.noise, "add_noise"):
+        env_cfg.noise.add_noise = False
+
     # adjust parameters according to terrain type
     if env_cfg.terrain.mesh_type in ["heightfield", "trimesh"]:
-        env_cfg.terrain.num_rows = 2
-        env_cfg.terrain.num_cols = 2
+        # Use mixed curriculum terrain in play so all rough-terrain categories are covered.
+        env_cfg.terrain.num_rows = 4
+        env_cfg.terrain.num_cols = 5
         env_cfg.terrain.border_size = 5.0
-        env_cfg.terrain.curriculum = False
-        env_cfg.terrain.selected = True
+        env_cfg.terrain.curriculum = True
+        if hasattr(env_cfg.terrain, "selected"):
+            env_cfg.terrain.selected = False
         env_cfg.env.debug_draw_terrain_height_points = False
-        
-        
-        # random uniform terrain
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.random_uniform_terrain", 
-        #                                   "min_height" : -0.05, "max_height": 0.05, 
-        #                                   "step":0.005, "downsampled_scale" : 0.2}
-        # slope
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.pyramid_sloped_terrain",
-        #                                   "slope": -0.4, "platform_size": 3.0}
-        # stairs
-        env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.pyramid_stairs_terrain",
-                                        "step_width": 0.31, "step_height": -0.1, "platform_size": 3.0}
-        # discrete obstacles
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.discrete_obstacles_terrain",
-        #                                   "max_height": 0.1,
-        #                                   "min_size": 1.0,
-        #                                   "max_size": 2.0,
-        #                                   "num_rects": 20,
-        #                                   "platform_size": 3.0}
-        # wave terrain
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.wave_terrain", 
-        #                                   "amplitude": 0.1, "num_waves": 2}
-        # stepping stones
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.stepping_stones_terrain",
-        #                                   "stone_size": 1.0, "max_height": 0.1,
-        #                                   "stone_distance": 0.3, "platform_size": 3.0}
-        # gap terrain
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.gap_terrain", 
-        #                                   "gap_size": 0.6, "platform_size": 3.0}
-        # pit terrain
-        # env_cfg.terrain.terrain_kwargs = {"type": "terrain_utils.pit_terrain", 
-        #                                   "depth": 0.2, "platform_size": 3.0}
-        
-        
+        # Ensure five-class rough-terrain mix in play:
+        # [slope, random_uniform, stairs_up/down, discrete_obstacles].
+        if hasattr(env_cfg.terrain, "terrain_proportions") and len(env_cfg.terrain.terrain_proportions) == 5:
+            env_cfg.terrain.terrain_proportions = [0.2, 0.1, 0.25, 0.25, 0.2]
+        # selected-terrain mode uses terrain_kwargs; clear it for mixed curriculum mode.
+        if hasattr(env_cfg.terrain, "terrain_kwargs"):
+            env_cfg.terrain.terrain_kwargs = None
+
     env_cfg.env.debug = True
     env_cfg.commands.zero_cmd_prob = 0.0 # for testing, use non-zero commands all the time
     env_cfg.commands.ranges.lin_vel_x = [0.5, 0.5]
@@ -112,23 +156,34 @@ def interaction_loop(env, policy, args, task_type):
     stop_state_log = 300 # number of steps before plotting states
     stop_rew_log = env.max_episode_length + 1 # number of steps before print average episode rewards
         
+    ts_like_task = task_type in {
+        "stage2",
+        "stage2a",
+        "stage2b",
+        "stage2c",
+        "stage3",
+        "stage3a",
+        "stage3b",
+    }
+
     # Get initial observations according to task type
-    if task_type == "depth_ts":
-        obs_buf, privileged_obs_buf, depth_image, critic_obs = env.get_observations()
-    elif task_type == "ts" or task_type == "cat" or task_type == "cts" or task_type == "cts_amp": # teacher-student specific (including AMP)
+    dreamwaq_like_task = task_type == "blind"
+
+    if ts_like_task:
         obs_buf, privileged_obs_buf, obs_history, critic_obs = env.get_observations()
-    elif task_type == "ee":
-        estimator_features, _, _ = env.get_observations()
-    elif task_type == "dreamwaq":  # dreamwaq
+    elif dreamwaq_like_task:
         obs_buf, privileged_obs_buf, obs_history, explicit_labels, next_states = env.get_observations()
-    else: # vanilla
+    else:
         obs_buf = env.get_observations()
     
     # Setup joystick if needed
     if args.use_joystick:
+        from legged_gym.scripts.joystick import Joystick
         joystick = Joystick(joystick_type=args.joystick_type)
     
     frame_dt = 1 / 60.0 # 30Hz
+    ts_policy_mode = getattr(args, "ts_policy_mode", "aux")
+
     # interaction loop
     for i in range(10*int(env.max_episode_length)):
         
@@ -147,24 +202,15 @@ def interaction_loop(env, policy, args, task_type):
             env.set_viewer_camera(pos, lookat)
             
         # Step the environment according to task type
-        if task_type == "depth_ts":
-            actions = policy(obs_buf, depth_image)
-            obs_buf, privileged_obs_buf, depth_image, critic_obs, rews, dones, infos = env.step(actions.detach())
-        elif task_type == "ts" or task_type == "cat" or task_type == "cts":
-            actions = policy(obs_buf, obs_history)
+        if ts_like_task:
+            if ts_policy_mode == "deploy":
+                actions = policy(obs_buf, privileged_obs_buf)
+            else:
+                actions = policy(obs_buf, obs_history)
             obs_buf, privileged_obs_buf, obs_history, critic_obs, rews, dones, infos = env.step(actions.detach())
-        elif task_type == "ee":
-            actions = policy(estimator_features.detach())
-            estimator_features, estimator_labels, _, rews, dones, infos = env.step(actions.detach())
-        elif task_type == "dreamwaq":
+        elif dreamwaq_like_task:
             actions = policy(obs_buf, obs_history)
             obs_buf, privileged_obs_buf, obs_history, explicit_labels, next_states, rews, dones, infos = env.step(actions.detach())
-        elif task_type == "amp":
-            actions = policy(obs_buf.detach())
-            obs_buf, _, rews, dones, infos, _, _ = env.step(actions.detach())
-        elif task_type == "cts_amp":
-            actions = policy(obs_buf, obs_history)
-            obs_buf, privileged_obs_buf, obs_history, critic_obs, rews, dones, infos, _, _ = env.step(actions.detach())
         else:
             actions = policy(obs_buf.detach())
             obs_buf, _, rews, dones, infos = env.step(actions.detach())
@@ -207,7 +253,7 @@ def interaction_loop(env, policy, args, task_type):
         if remaining > 0:
             time.sleep(remaining)
 
-def export_policy(alg_runner, path: str, args, env_cfg, train_cfg, task_type):
+def export_policy(alg_runner, path: str, args, env_cfg, train_cfg, task_type, ts_policy_mode: str):
     """export the policy as jit script according to different task types
 
     Args:
@@ -217,15 +263,31 @@ def export_policy(alg_runner, path: str, args, env_cfg, train_cfg, task_type):
         env_cfg: environment configuration
         train_cfg: training configuration
     """
-    if task_type == "depth_ts":
-        pass
-    elif task_type == "ts" or task_type == "cat" or task_type == "cts" or task_type == "cts_amp":
-        exporter = PolicyExporterTS(alg_runner.alg.actor_critic)
+    ts_like_task = task_type in {
+        "stage2",
+        "stage2a",
+        "stage2b",
+        "stage2c",
+        "stage3",
+        "stage3a",
+        "stage3b",
+    }
+
+    dreamwaq_like_task = task_type == "blind"
+
+    if ts_like_task:
+        if task_type in {"stage3", "stage3a", "stage3b"}:
+            if ts_policy_mode == "deploy":
+                exporter = PolicyExporterTSDeploy(alg_runner.alg.actor_critic)
+            else:
+                exporter = PolicyExporterTS(alg_runner.alg.actor_critic)
+        else:
+            if ts_policy_mode == "deploy":
+                exporter = PolicyExporterTSTeacher(alg_runner.alg.actor_critic)
+            else:
+                exporter = PolicyExporterTS(alg_runner.alg.actor_critic)
         exporter.export(path, env_cfg, args.export_onnx, train_cfg)
-    elif task_type == "ee":
-        exporter = PolicyExporterEE(alg_runner.alg.actor_critic)
-        exporter.export(path, env_cfg, args.export_onnx, train_cfg)
-    elif task_type == "dreamwaq":
+    elif dreamwaq_like_task:
         exporter = PolicyExporterWaQ(alg_runner.alg.actor_critic)
         exporter.export(path, env_cfg, args.export_onnx, train_cfg)
     else:
@@ -250,23 +312,72 @@ def play(args):
         )
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     splitted = args.task.split("_")
-    # by default, the first part of the task name is robot name, and the second part is task type, e.g. go2_ts, go2_cat, go2_ee, go2_cts, go2_dreamwaq, go2_ts_depth
-    # concatenate the parts after the first part to get the task type, e.g. ts, cat, ee, cts, dreamwaq, ts_depth
+    # Task names are "go2" or "go2_<variant>"; the variant becomes task_type.
     task_type = "_".join(splitted[1:])
     print("Task type: ", task_type)
+    ts_like_task = task_type in {
+        "stage2",
+        "stage2a",
+        "stage2b",
+        "stage2c",
+        "stage3",
+        "stage3a",
+        "stage3b",
+    }
+    stage3_like_task = task_type in {"stage3", "stage3a", "stage3b"}
+    if task_type in {"stage2", "stage2a", "stage2b", "stage2c"} and not args.use_teacher:
+        print("Warning: stage2 play defaults to student policy (no privileged heights). "
+              "Use --use_teacher to evaluate GT-teacher behavior.")
+
+    if stage3_like_task:
+        if args.use_aux_policy:
+            ts_policy_mode = "aux"
+            print("Stage3 inference mode set to AUX history branch (--use_aux_policy).")
+        else:
+            ts_policy_mode = "deploy"
+            if args.use_teacher:
+                print("Info: --use_teacher is a legacy alias. Stage3 default already uses deploy branch.")
+            print("Stage3 inference mode default: DEPLOY branch (runtime terrain input).")
+    else:
+        ts_policy_mode = "deploy" if args.use_teacher else "aux"
+
+    args.ts_policy_mode = ts_policy_mode
     override_configs(env_cfg, args, task_type)
+
+    if stage3_like_task:
+        # Inference does not require distillation teacher attachment.
+        # Avoid forcing --teacher_model_path for stage3 play.
+        for key in [
+            "distill_action_coef",
+            "distill_action_coef_final",
+            "distill_latent_coef",
+            "distill_latent_coef_final",
+            "distill_height_coef",
+            "distill_total_iters",
+        ]:
+            if hasattr(train_cfg.algorithm, key):
+                setattr(train_cfg.algorithm, key, 0.0 if key != "distill_total_iters" else 0)
 
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     # load policy
     train_cfg.runner.resume = True
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
-    policy = ppo_runner.get_inference_policy(device=env.device)
+    if ts_like_task:
+        if ts_policy_mode == "deploy":
+            print("TS inference mode: deploy (uses terrain/privileged observations).")
+            policy = ppo_runner.get_deploy_inference_policy(device=env.device)
+        else:
+            print("TS inference mode: aux history branch.")
+            policy = ppo_runner.get_aux_inference_policy(device=env.device)
+    else:
+        policy = ppo_runner.get_inference_policy(device=env.device)
     
     # export policy as a jit module (used to run it from C++ or python)
-    path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 
-                            train_cfg.runner.load_run, 'exported')
-    export_policy(ppo_runner, path, args, env_cfg, train_cfg, task_type)
+    export_run_name = os.path.basename(os.path.normpath(train_cfg.runner.load_run))
+    path = os.path.join(LEGGED_GYM_RESULTS_DIR, 'training_logs', train_cfg.runner.experiment_name,
+                            export_run_name, 'exported')
+    export_policy(ppo_runner, path, args, env_cfg, train_cfg, task_type, ts_policy_mode)
 
     interaction_loop(env, policy, args, task_type)
     

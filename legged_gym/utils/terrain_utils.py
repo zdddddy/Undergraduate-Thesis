@@ -191,6 +191,35 @@ def pyramid_sloped_terrain(terrain: SubTerrain,
     return terrain
 
 
+def rough_sloped_terrain(terrain: SubTerrain,
+                         slope: float = 1,
+                         min_height: float = -0.04,
+                         max_height: float = 0.04,
+                         step: float = 0.005,
+                         downsampled_scale: float = 0.2,
+                         platform_size: float = 1.,
+                         terrain_type: str = None) -> SubTerrain:
+    """Generate a sloped terrain with superposed small random height variations."""
+    if terrain_type in [None, "plane"]:
+        raise ValueError("rough_sloped_terrain can only be used for heightfield or trimesh terrain type")
+
+    pyramid_sloped_terrain(
+        terrain,
+        slope=slope,
+        platform_size=platform_size,
+        terrain_type="heightfield",
+    )
+    random_uniform_terrain(
+        terrain,
+        min_height=min_height,
+        max_height=max_height,
+        step=step,
+        downsampled_scale=downsampled_scale,
+        terrain_type=terrain_type,
+    )
+    return terrain
+
+
 def discrete_obstacles_terrain(terrain : SubTerrain, 
                                max_height : float, 
                                min_size : float, 
@@ -268,6 +297,29 @@ def discrete_obstacles_terrain(terrain : SubTerrain,
         terrain.terrain_mesh = trimesh.util.concatenate([terrain_mesh, border_mesh])
     
     return terrain
+
+
+def random_discrete_obstacles_terrain(terrain: SubTerrain,
+                                      min_height: float,
+                                      max_height: float,
+                                      min_size: float,
+                                      max_size: float,
+                                      num_rects: int,
+                                      platform_size: float = 1.,
+                                      terrain_type: str = None) -> SubTerrain:
+    """Generate discrete obstacles with a per-subterrain sampled height limit."""
+    if max_height < min_height:
+        raise ValueError("max_height must be greater than or equal to min_height")
+    sampled_height = float(np.random.uniform(min_height, max_height))
+    return discrete_obstacles_terrain(
+        terrain,
+        max_height=sampled_height,
+        min_size=min_size,
+        max_size=max_size,
+        num_rects=num_rects,
+        platform_size=platform_size,
+        terrain_type=terrain_type,
+    )
 
 
 def wave_terrain(terrain : SubTerrain, 
@@ -386,6 +438,27 @@ def pyramid_stairs_terrain(terrain : SubTerrain,
                                                            platform_size=platform_size * terrain.horizontal_scale)
         
     return terrain
+
+
+def random_pyramid_stairs_terrain(terrain: SubTerrain,
+                                  step_width: float,
+                                  min_step_height: float,
+                                  max_step_height: float,
+                                  direction: float = 1.0,
+                                  platform_size: float = 1.,
+                                  terrain_type: str = None) -> SubTerrain:
+    """Generate stairs with a per-subterrain sampled step height."""
+    if max_step_height < min_step_height:
+        raise ValueError("max_step_height must be greater than or equal to min_step_height")
+    sign = 1.0 if direction >= 0.0 else -1.0
+    sampled_height = sign * float(np.random.uniform(min_step_height, max_step_height))
+    return pyramid_stairs_terrain(
+        terrain,
+        step_width=step_width,
+        step_height=sampled_height,
+        platform_size=platform_size,
+        terrain_type=terrain_type,
+    )
 
 
 def stepping_stones_terrain(terrain : SubTerrain, 
